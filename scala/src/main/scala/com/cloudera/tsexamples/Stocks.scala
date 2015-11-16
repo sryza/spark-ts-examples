@@ -3,6 +3,7 @@ package com.cloudera.tsexamples
 import java.sql.Timestamp
 
 import com.cloudera.sparkts._
+import com.cloudera.sparkts.stats.TimeSeriesStatisticalTests
 import org.apache.spark.{SparkContext, SparkConf}
 import org.apache.spark.sql.{DataFrame, Row, SQLContext}
 import org.apache.spark.sql.types._
@@ -14,12 +15,12 @@ object Stocks {
    * Creates a Spark DataFrame of (timestamp, symbol, price) from a tab-separated file of stock
    * ticker data.
    */
-  def loadTickerObservations(sqlContext: SQLContext, path: String): DataFrame = {
+  def loadObservations(sqlContext: SQLContext, path: String): DataFrame = {
     val rowRdd = sqlContext.sparkContext.textFile(path).map { line =>
       val tokens = line.split('\t')
-      val dt = new DateTime(tokens(0).toInt, tokens(1).toInt, tokens(2).toInt, tokens(3).toInt, 0)
-      val symbol = tokens(4)
-      val price = tokens(6).toDouble
+      val dt = new DateTime(tokens(0).toInt, tokens(1).toInt, tokens(2).toInt, 0, 0)
+      val symbol = tokens(3)
+      val price = tokens(4).toDouble
       Row(new Timestamp(dt.getMillis), symbol, price)
     }
     val fields = Seq(
@@ -32,19 +33,23 @@ object Stocks {
   }
 
   def main(args: Array[String]): Unit = {
-    val conf = new SparkConf().setAppName("Spark-TS Stocks Example").setMaster("local")
+    val conf = new SparkConf().setAppName("Spark-TS Wiki Example").setMaster("local")
+    conf.set("spark.io.compression.codec", "org.apache.spark.io.LZ4CompressionCodec")
     val sc = new SparkContext(conf)
     val sqlContext = new SQLContext(sc)
 
-    val tickerObs = loadTickerObservations(sqlContext, "../data/ticker.tsv")
+    val tickerObs = loadObservations(sqlContext, "../data/ticker.tsv")
 
-    // Create an hourly DateTimeIndex over August and September 2015
+    // Create an daily DateTimeIndex over August and September 2015
     val dtIndex = DateTimeIndex.uniform(
-      new DateTime("2015-08-03"), new DateTime("2015-09-22"), new DayFrequency(1))
+      new DateTime("2015-08-03"), new DateTime("2015-09-22"), new BusinessDayFrequency(1))
 
     // Align the ticker data on the DateTimeIndex to create a TimeSeriesRDD
     val tickerTsrdd = TimeSeriesRDD.timeSeriesRDDFromObservations(dtIndex, tickerObs,
       "timestamp", "symbol", "price")
+
+    // Cache it in memory
+    tickerTsrdd.cache()
 
     // Count the number of series (number of symbols)
     println(tickerTsrdd.count())
@@ -55,11 +60,10 @@ object Stocks {
     // Compute return rates
     val returnRates = filled.returnRates()
 
-    // Fit an autoregressive model to each series
-    val models = returnRates.mapValues(Autoregression.fitModel(_, 1))
+    // Compute Durbin-Watson stats for each series
+    val dwStats = returnRates.mapValues(TimeSeriesStatisticalTests.dwtest(_))
 
-    // Which has the largest AR coefficient?
-    val symbolWithLargestPhi = models.mapValues(_.coefficients(0)).map(_.swap).max
-    println(symbolWithLargestPhi)
+    println(dwStats.min)
+    println(dwStats.max)
   }
 }
