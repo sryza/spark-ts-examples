@@ -63,7 +63,7 @@ object Stocks {
     // Compute Durbin-Watson stats for each series
     val dwStats = returnRates.mapValues(TimeSeriesStatisticalTests.dwtest(_))
 
-    println(dwStats.min)
-    println(dwStats.max)
+    println(dwStats.map(_.swap).min)
+    println(dwStats.map(_.swap).max)
   }
 }
