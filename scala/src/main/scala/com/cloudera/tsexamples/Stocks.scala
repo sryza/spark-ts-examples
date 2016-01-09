@@ -1,14 +1,15 @@
 package com.cloudera.tsexamples
 
 import java.sql.Timestamp
+import java.time.{ZoneId, ZonedDateTime}
 
+import breeze.linalg.DenseVector
 import com.cloudera.sparkts._
 import com.cloudera.sparkts.stats.TimeSeriesStatisticalTests
+
 import org.apache.spark.{SparkContext, SparkConf}
 import org.apache.spark.sql.{DataFrame, Row, SQLContext}
 import org.apache.spark.sql.types._
-import org.joda.time.DateTime
-import com.cloudera.sparkts.models.Autoregression
 
 object Stocks {
   /**
@@ -18,10 +19,11 @@ object Stocks {
   def loadObservations(sqlContext: SQLContext, path: String): DataFrame = {
     val rowRdd = sqlContext.sparkContext.textFile(path).map { line =>
       val tokens = line.split('\t')
-      val dt = new DateTime(tokens(0).toInt, tokens(1).toInt, tokens(2).toInt, 0, 0)
+      val dt = ZonedDateTime.of(tokens(0).toInt, tokens(1).toInt, tokens(2).toInt, 0, 0, 0, 0,
+        ZoneId.systemDefault())
       val symbol = tokens(3)
       val price = tokens(4).toDouble
-      Row(new Timestamp(dt.getMillis), symbol, price)
+      Row(Timestamp.from(dt.toInstant), symbol, price)
     }
     val fields = Seq(
       StructField("timestamp", TimestampType, true),
@@ -41,8 +43,9 @@ object Stocks {
     val tickerObs = loadObservations(sqlContext, "../data/ticker.tsv")
 
     // Create an daily DateTimeIndex over August and September 2015
-    val dtIndex = DateTimeIndex.uniform(
-      new DateTime("2015-08-03"), new DateTime("2015-09-22"), new BusinessDayFrequency(1))
+    val dtIndex = DateTimeIndex.uniformFromInterval(
+      ZonedDateTime.parse("2015-08-03"), ZonedDateTime.parse("2015-09-22"),
+      new BusinessDayFrequency(1))
 
     // Align the ticker data on the DateTimeIndex to create a TimeSeriesRDD
     val tickerTsrdd = TimeSeriesRDD.timeSeriesRDDFromObservations(dtIndex, tickerObs,
@@ -61,7 +64,9 @@ object Stocks {
     val returnRates = filled.returnRates()
 
     // Compute Durbin-Watson stats for each series
-    val dwStats = returnRates.mapValues(TimeSeriesStatisticalTests.dwtest(_))
+    val dwStats = returnRates.mapValues { x =>
+      TimeSeriesStatisticalTests.dwtest(new DenseVector[Double](x.toArray))
+    }
 
     println(dwStats.map(_.swap).min)
     println(dwStats.map(_.swap).max)
