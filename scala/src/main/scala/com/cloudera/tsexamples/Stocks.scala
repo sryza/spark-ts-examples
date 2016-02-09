@@ -11,6 +11,10 @@ import org.apache.spark.{SparkContext, SparkConf}
 import org.apache.spark.sql.{DataFrame, Row, SQLContext}
 import org.apache.spark.sql.types._
 
+/**
+ * An example exhibiting the use of TimeSeriesRDD for loading, cleaning, and filtering stock ticker
+ * data.
+ */
 object Stocks {
   /**
    * Creates a Spark DataFrame of (timestamp, symbol, price) from a tab-separated file of stock
