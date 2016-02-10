@@ -39,7 +39,7 @@ object Stocks {
   }
 
   def main(args: Array[String]): Unit = {
-    val conf = new SparkConf().setAppName("Spark-TS Wiki Example").setMaster("local")
+    val conf = new SparkConf().setAppName("Spark-TS Ticker Example").setMaster("local")
     conf.set("spark.io.compression.codec", "org.apache.spark.io.LZ4CompressionCodec")
     val sc = new SparkContext(conf)
     val sqlContext = new SQLContext(sc)
