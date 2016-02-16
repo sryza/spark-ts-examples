@@ -1,7 +1,7 @@
 package com.cloudera.tsexamples
 
 import java.sql.Timestamp
-import java.time.{ZoneId, ZonedDateTime}
+import java.time.{LocalDateTime, ZoneId, ZonedDateTime}
 
 import breeze.linalg.DenseVector
 import com.cloudera.sparkts._
@@ -47,8 +47,10 @@ object Stocks {
     val tickerObs = loadObservations(sqlContext, "../data/ticker.tsv")
 
     // Create an daily DateTimeIndex over August and September 2015
+    val zone = ZoneId.systemDefault()
     val dtIndex = DateTimeIndex.uniformFromInterval(
-      ZonedDateTime.parse("2015-08-03"), ZonedDateTime.parse("2015-09-22"),
+      ZonedDateTime.of(LocalDateTime.parse("2015-08-03T00:00:00"), zone),
+      ZonedDateTime.of(LocalDateTime.parse("2015-09-22T00:00:00"), zone),
       new BusinessDayFrequency(1))
 
     // Align the ticker data on the DateTimeIndex to create a TimeSeriesRDD
