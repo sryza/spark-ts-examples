@@ -3,7 +3,6 @@ package com.cloudera.tsexamples
 import java.sql.Timestamp
 import java.time.{LocalDateTime, ZoneId, ZonedDateTime}
 
-import breeze.linalg.DenseVector
 import com.cloudera.sparkts._
 import com.cloudera.sparkts.stats.TimeSeriesStatisticalTests
 
@@ -70,9 +69,7 @@ object Stocks {
     val returnRates = filled.returnRates()
 
     // Compute Durbin-Watson stats for each series
-    val dwStats = returnRates.mapValues { x =>
-      TimeSeriesStatisticalTests.dwtest(new DenseVector[Double](x.toArray))
-    }
+    val dwStats = returnRates.mapValues(TimeSeriesStatisticalTests.dwtest)
 
     println(dwStats.map(_.swap).min)
     println(dwStats.map(_.swap).max)
