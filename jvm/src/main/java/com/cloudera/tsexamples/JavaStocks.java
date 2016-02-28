@@ -1,6 +1,5 @@
 package com.cloudera.tsexamples;
 
-import breeze.linalg.DenseVector;
 import com.cloudera.sparkts.BusinessDayFrequency;
 import com.cloudera.sparkts.DateTimeIndex;
 import com.cloudera.sparkts.api.java.DateTimeIndexFactory;
@@ -11,7 +10,6 @@ import org.apache.spark.SparkConf;
 import org.apache.spark.api.java.JavaPairRDD;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
-import org.apache.spark.api.java.function.Function;
 import org.apache.spark.mllib.linalg.Vector;
 import org.apache.spark.sql.DataFrame;
 import org.apache.spark.sql.Row;
@@ -31,8 +29,7 @@ import java.util.List;
 public class JavaStocks {
   private static DataFrame loadObservations(JavaSparkContext sparkContext, SQLContext sqlContext,
       String path) {
-    JavaRDD<Row> rowRdd = sparkContext.textFile(path).map(new Function<String, Row>() {
-      public Row call(String line) {
+    JavaRDD<Row> rowRdd = sparkContext.textFile(path).map((String line) -> {
         String[] tokens = line.split("\t");
         ZonedDateTime dt = ZonedDateTime.of(Integer.parseInt(tokens[0]),
             Integer.parseInt(tokens[1]), Integer.parseInt(tokens[1]), 0, 0, 0, 0,
@@ -40,7 +37,6 @@ public class JavaStocks {
         String symbol = tokens[3];
         double price = Double.parseDouble(tokens[4]);
         return RowFactory.create(Timestamp.from(dt.toInstant()), symbol, price);
-      }
     });
     List<StructField> fields = new ArrayList();
     fields.add(DataTypes.createStructField("timestamp", DataTypes.TimestampType, true));
@@ -64,7 +60,7 @@ public class JavaStocks {
         new BusinessDayFrequency(1, 0));
 
     // Align the ticker data on the DateTimeIndex to create a TimeSeriesRDD
-    JavaTimeSeriesRDD tickerTsrdd = JavaTimeSeriesRDDFactory.javaTimeSeriesRDDFromObservations(
+    JavaTimeSeriesRDD tickerTsrdd = JavaTimeSeriesRDDFactory.timeSeriesRDDFromObservations(
         dtIndex, tickerObs, "timestamp", "symbol", "price");
 
     // Cache it in memory
@@ -80,14 +76,16 @@ public class JavaStocks {
     JavaTimeSeriesRDD<String> returnRates = filled.returnRates();
 
     // Compute Durbin-Watson stats for each series
-    JavaPairRDD<String, Double> dwStats = returnRates.mapValues(new Function<Vector, Double>() {
-      public Double call(Vector x) {
-        TimeSeriesStatisticalTests.dwtest(new DenseVector<Double>(x.toArray()))
-      }
-    });
+    JavaPairRDD<String, Double> dwStats = returnRates.mapValues(
+        (Vector x) -> TimeSeriesStatisticalTests.dwtest(x)
+    );
 
-    System.out.println(dwStats.map(_.swap).min)
-    System.out.println(dwStats.map(_.swap).max)
+    System.out.println(dwStats.min(
+        (Tuple2<String, Double> a, Tuple2<String, Double> b) -> a._2.compareTo(b._2)
+    ));
+    System.out.println(dwStats.max(
+        (Tuple2<String, Double> a, Tuple2<String, Double> b) -> a._2.compareTo(b._2)
+    ));
   }
 }
 
