@@ -20,11 +20,14 @@ import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
 import scala.Tuple2;
 
+import java.util.Comparator;
 import java.sql.Timestamp;
+import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.List;
+
 
 public class JavaStocks {
   private static DataFrame loadObservations(JavaSparkContext sparkContext, SQLContext sqlContext,
@@ -35,7 +38,8 @@ public class JavaStocks {
             Integer.parseInt(tokens[1]), Integer.parseInt(tokens[1]), 0, 0, 0, 0,
             ZoneId.systemDefault());
         String symbol = tokens[3];
-        double price = Double.parseDouble(tokens[4]);
+        int volume = Integer.parseInt(tokens[4]);
+        double price = Double.parseDouble(tokens[5]);
         return RowFactory.create(Timestamp.from(dt.toInstant()), symbol, price);
     });
     List<StructField> fields = new ArrayList();
@@ -45,7 +49,7 @@ public class JavaStocks {
     StructType schema = DataTypes.createStructType(fields);
     return sqlContext.createDataFrame(rowRdd, schema);
   }
-
+  
   public static void main(String[] args) {
     SparkConf conf = new SparkConf().setAppName("Spark-TS Ticker Example").setMaster("local");
     conf.set("spark.io.compression.codec", "org.apache.spark.io.LZ4CompressionCodec");
@@ -55,8 +59,10 @@ public class JavaStocks {
     DataFrame tickerObs = loadObservations(context, sqlContext, "../data/ticker.tsv");
 
     // Create an daily DateTimeIndex over August and September 2015
+    ZoneId zone = ZoneId.systemDefault();
     DateTimeIndex dtIndex = DateTimeIndexFactory.uniformFromInterval(
-        ZonedDateTime.parse("2015-08-03"), ZonedDateTime.parse("2015-09-22"),
+        ZonedDateTime.of(LocalDateTime.parse("2015-08-03T00:00:00"), zone),
+        ZonedDateTime.of(LocalDateTime.parse("2015-09-22T00:00:00"), zone),
         new BusinessDayFrequency(1, 0));
 
     // Align the ticker data on the DateTimeIndex to create a TimeSeriesRDD
@@ -80,12 +86,14 @@ public class JavaStocks {
         (Vector x) -> TimeSeriesStatisticalTests.dwtest(x)
     );
 
-    System.out.println(dwStats.min(
-        (Tuple2<String, Double> a, Tuple2<String, Double> b) -> a._2.compareTo(b._2)
-    ));
-    System.out.println(dwStats.max(
-        (Tuple2<String, Double> a, Tuple2<String, Double> b) -> a._2.compareTo(b._2)
-    ));
+    class StatsComparator implements Comparator<Tuple2<String,Double>>, java.io.Serializable {
+        public int compare(Tuple2<String,Double> a, Tuple2<String,Double> b) {
+            return a._2.compareTo(b._2);
+        }
+    }
+
+    System.out.println(dwStats.min(new StatsComparator()));
+    System.out.println(dwStats.max(new StatsComparator()));
   }
 }
 
