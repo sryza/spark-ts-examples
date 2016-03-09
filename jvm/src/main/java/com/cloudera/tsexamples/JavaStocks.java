@@ -38,7 +38,6 @@ public class JavaStocks {
             Integer.parseInt(tokens[1]), Integer.parseInt(tokens[1]), 0, 0, 0, 0,
             ZoneId.systemDefault());
         String symbol = tokens[3];
-        int volume = Integer.parseInt(tokens[4]);
         double price = Double.parseDouble(tokens[5]);
         return RowFactory.create(Timestamp.from(dt.toInstant()), symbol, price);
     });
@@ -87,7 +86,7 @@ public class JavaStocks {
     );
 
     class StatsComparator implements Comparator<Tuple2<String,Double>>, java.io.Serializable {
-        public int compare(Tuple2<String,Double> a, Tuple2<String,Double> b) {
+        public int compare(Tuple2<String, Double> a, Tuple2<String, Double> b) {
             return a._2.compareTo(b._2);
         }
     }
