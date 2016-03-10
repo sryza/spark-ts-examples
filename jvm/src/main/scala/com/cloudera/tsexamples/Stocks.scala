@@ -25,7 +25,7 @@ object Stocks {
       val dt = ZonedDateTime.of(tokens(0).toInt, tokens(1).toInt, tokens(2).toInt, 0, 0, 0, 0,
         ZoneId.systemDefault())
       val symbol = tokens(3)
-      val price = tokens(4).toDouble
+      val price = tokens(5).toDouble
       Row(Timestamp.from(dt.toInstant), symbol, price)
     }
     val fields = Seq(
@@ -67,7 +67,7 @@ object Stocks {
 
     // Compute return rates
     val returnRates = filled.returnRates()
-
+    
     // Compute Durbin-Watson stats for each series
     val dwStats = returnRates.mapValues(TimeSeriesStatisticalTests.dwtest)
 
